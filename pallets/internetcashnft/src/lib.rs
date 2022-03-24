@@ -302,8 +302,7 @@ pub mod pallet {
                 owner: owner.clone(),
 				creator: owner.clone(),
 				royalty: 0,
-				
-            };
+			};
         
             let nft_id = T::Hashing::hash_of(&nft);
         
