@@ -31,9 +31,9 @@ pub mod pallet {
 		pub gender: Gender,
 		pub owner: AccountOf<T>,
 		pub creator: AccountOf<T>,
-		pub royalty: u8,
+		pub royalty: Option<BalanceOf<T>>,
 	}
-	// Enum declaration for Gender.
+	// Enum declaration for Gender.h\
 	#[derive(Clone, Encode, Decode, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 	pub enum Gender {
@@ -102,7 +102,7 @@ pub mod pallet {
         /// A NFT was successfully bought. \[buyer, seller, _id, bid_price\]
         Bought(T::AccountId, T::AccountId, T::Hash, BalanceOf<T>),
 		/// Caretor Royalty for NFT Was successfully set
-		RoyaltySet(T::AccountId, T::Hash, u8),
+		RoyaltySet(T::AccountId, T::Hash, Option<BalanceOf<T>>),
 	}
 
 	// Storage items.
@@ -116,7 +116,7 @@ pub mod pallet {
 	/// Stores a nft's unique traits, owner and price.
 	pub(super) type Nfts<T: Config> = StorageMap<_, Twox64Concat, T::Hash, InternetCashNFT<T>>;
 
-	#[pallet::storage]
+	#[pallet::storage]		
 	#[pallet::getter(fn nfts_owned)]
 	/// Keeps track of what accounts own what NFT.
 	pub(super) type 
@@ -167,7 +167,7 @@ pub mod pallet {
 		pub fn set_creator_royalty(
 			origin: OriginFor<T>,
 			nft_id: T::Hash,
-			royalty: u8
+			royalty: Option<BalanceOf<T>>
 		)-> DispatchResult {
 
 			let sender = ensure_signed(origin)?;
@@ -240,9 +240,18 @@ pub mod pallet {
 			ensure!((to_owned.len() as u32) < T::MaxNFTsOwned::get(), <Error<T>>::ExceedMaxNFTOwned);
 			let seller = nft.owner.clone();
 
-			// Transfer the amount from buyer to seller
-			T::Currency::transfer(&buyer, &seller, bid_price, ExistenceRequirement::KeepAlive)?;
 
+			let creator_share_percent = nft.royalty.map(|creator_roality| {
+				nft.price.unwrap_or_default() * creator_roality / 100u32.into()
+			});
+			
+
+			// let creator_share = nft.price.map(|nft_price| {
+			// 	nft.price.unwrap_or_default() / creator_share_percent
+			// });
+		  
+			//Transfer the amount from buyer to seller
+			T::Currency::transfer(&buyer, &seller, bid_price, ExistenceRequirement::KeepAlive)?;
 			// Transfer the nft from seller to buyer
 			Self::transfer_nft_to(&nft_id, &buyer)?;
 
@@ -301,7 +310,7 @@ pub mod pallet {
                 gender: gender.unwrap_or_else(Self::gen_gender),
                 owner: owner.clone(),
 				creator: owner.clone(),
-				royalty: 0,
+				royalty: None,
 			};
         
             let nft_id = T::Hashing::hash_of(&nft);
@@ -371,6 +380,10 @@ pub mod pallet {
 			}).map_err(|_| <Error<T>>::ExceedMaxNFTOwned)?;
 
 			Ok(())
+		}
+		//function to  convert balance to u64
+		pub fn balance_to_u64(input: BalanceOf<T>) -> Option<u64> {
+			TryInto::<u64>::try_into(input).ok()
 		}
 	
 	}
