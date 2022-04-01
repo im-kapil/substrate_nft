@@ -239,19 +239,27 @@ pub mod pallet {
 			let to_owned = <NFTsOwned<T>>::get(&buyer);
 			ensure!((to_owned.len() as u32) < T::MaxNFTsOwned::get(), <Error<T>>::ExceedMaxNFTOwned);
 			let seller = nft.owner.clone();
-
-
-			let creator_share_percent = nft.royalty.map(|creator_roality| {
-				nft.price.unwrap_or_default() * creator_roality / 100u32.into()
-			});
+			let creator = nft.creator.clone();
 			
+			let creator_share = nft.royalty.map(|creator_royalty| {
+				nft.price.unwrap_or_default() * creator_royalty / 100u32.into()
+			});
 
-			// let creator_share = nft.price.map(|nft_price| {
-			// 	nft.price.unwrap_or_default() / creator_share_percent
-			// });
-		  
+			//Transfer the creator share to creator's address
+			if let Some(creator_share) = creator_share{
+				T::Currency::transfer(&buyer, &creator, creator_share, ExistenceRequirement::KeepAlive)?;	
+			};
+			//Transfer the owner share to owner's address
+			let owner_share = nft.royalty.map(|creator_royalty|{ 
+				nft.price.unwrap_or_default() - (nft.price.unwrap_or_default() * creator_royalty / 100u32.into())
+			});
+
+			if let Some(owner_share) = owner_share{
+				T::Currency::transfer(&buyer, &creator, owner_share, ExistenceRequirement::KeepAlive)?;	
+			}
+
 			//Transfer the amount from buyer to seller
-			T::Currency::transfer(&buyer, &seller, bid_price, ExistenceRequirement::KeepAlive)?;
+			// T::Currency::transfer(&buyer, &seller, bid_price, ExistenceRequirement::KeepAlive)?;
 			// Transfer the nft from seller to buyer
 			Self::transfer_nft_to(&nft_id, &buyer)?;
 
