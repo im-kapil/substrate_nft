@@ -245,21 +245,30 @@ pub mod pallet {
 				nft.price.unwrap_or_default() * creator_royalty / 100u32.into()
 			});
 
-			//Transfer the creator share to creator's address
-			if let Some(creator_share) = creator_share{
-				T::Currency::transfer(&buyer, &creator, creator_share, ExistenceRequirement::KeepAlive)?;	
-			};
+			// //Transfer the creator share to creator's address
+			// if let Some(creator_share) = creator_share{
+			// 	T::Currency::transfer(&buyer, &creator, creator_share, ExistenceRequirement::KeepAlive)?;	
+			// };
+
 			//Transfer the owner share to owner's address
 			let owner_share = nft.royalty.map(|creator_royalty|{ 
-				nft.price.unwrap_or_default() - (nft.price.unwrap_or_default() * creator_royalty / 100u32.into())
+			   	nft.price.unwrap_or_default() - (nft.price.unwrap_or_default() * creator_royalty / 100u32.into())
 			});
 
-			if let Some(owner_share) = owner_share{
-				T::Currency::transfer(&buyer, &creator, owner_share, ExistenceRequirement::KeepAlive)?;	
-			}
+			// if let Some(owner_share) = owner_share{
+			// 	T::Currency::transfer(&buyer, &creator, owner_share, ExistenceRequirement::KeepAlive)?;	
+			// }
+
+
+			//Transfer the owner's share		
+			T::Currency::transfer(&buyer, &seller, owner_share.unwrap_or_default(), ExistenceRequirement::KeepAlive)?;	
+
+			//Transfer the Creator's share
+			T::Currency::transfer(&buyer, &creator, creator_share.unwrap_or_default(), ExistenceRequirement::KeepAlive)?;	
+
 
 			//Transfer the amount from buyer to seller
-			// T::Currency::transfer(&buyer, &seller, bid_price, ExistenceRequirement::KeepAlive)?;
+			//  T::Currency::transfer(&buyer, &seller, bid_price, ExistenceRequirement::KeepAlive)?;
 			// Transfer the nft from seller to buyer
 			Self::transfer_nft_to(&nft_id, &buyer)?;
 
