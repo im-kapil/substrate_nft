@@ -103,6 +103,10 @@ pub mod pallet {
         Bought(T::AccountId, T::AccountId, T::Hash, BalanceOf<T>),
 		/// Caretor Royalty for NFT Was successfully set
 		RoyaltySet(T::AccountId, T::Hash, Option<BalanceOf<T>>),
+		/// Royalty paid to creator
+		CreatorRoyaltyPaid(T::AccountId, T::AccountId, BalanceOf<T>),
+		/// Pay the onwer's share
+		OwnerPaid(T::AccountId, T::AccountId, BalanceOf<T>),
 	}
 
 	// Storage items.
@@ -183,7 +187,6 @@ pub mod pallet {
 			// Emit Price set event after setting the price 
 			Self::deposit_event(Event::RoyaltySet(sender, nft_id, royalty));
 			Ok(())
-
 		}
 
 		//Transfer NFT Function 
@@ -220,6 +223,7 @@ pub mod pallet {
 			bid_price: BalanceOf<T>
 		) -> DispatchResult {
 			let buyer = ensure_signed(origin)?;
+			
 	
 			// Check the nft exists and buyer is not the current nft owner
 			let nft = Self::nfts(&nft_id).ok_or(<Error<T>>::NFTNotExist)?;
@@ -240,45 +244,31 @@ pub mod pallet {
 			ensure!((to_owned.len() as u32) < T::MaxNFTsOwned::get(), <Error<T>>::ExceedMaxNFTOwned);
 			let seller = nft.owner.clone();
 			let creator = nft.creator.clone();
-			
+
+			//Calculating the Creator_share (creator Royalty)
 			let creator_share = nft.royalty.map(|creator_royalty| {
 				nft.price.unwrap_or_default() * creator_royalty / 100u32.into()
 			});
-
-			// //Transfer the creator share to creator's address
-			// if let Some(creator_share) = creator_share{
-			// 	T::Currency::transfer(&buyer, &creator, creator_share, ExistenceRequirement::KeepAlive)?;	
-			// };
-
-			//Transfer the owner share to owner's address
+			//Calculating the owner share 
 			let owner_share = nft.royalty.map(|creator_royalty|{ 
 			   	nft.price.unwrap_or_default() - (nft.price.unwrap_or_default() * creator_royalty / 100u32.into())
 			});
 
-			// if let Some(owner_share) = owner_share{
-			// 	T::Currency::transfer(&buyer, &creator, owner_share, ExistenceRequirement::KeepAlive)?;	
-			// }
-
-
 			//Transfer the owner's share		
-			T::Currency::transfer(&buyer, &seller, owner_share.unwrap_or_default(), ExistenceRequirement::KeepAlive)?;	
+			Self::pay_owner_share(&buyer, &seller, owner_share.unwrap_or_default())?;
 
 			//Transfer the Creator's share
-			T::Currency::transfer(&buyer, &creator, creator_share.unwrap_or_default(), ExistenceRequirement::KeepAlive)?;	
+		     Self::pay_creator_royalty(&buyer, &creator, creator_share.unwrap_or_default())?;
 
 
-			//Transfer the amount from buyer to seller
-			//  T::Currency::transfer(&buyer, &seller, bid_price, ExistenceRequirement::KeepAlive)?;
 			// Transfer the nft from seller to buyer
 			Self::transfer_nft_to(&nft_id, &buyer)?;
-
+			
 			// Deposit relevant Event
 			Self::deposit_event(Event::Bought(buyer, seller, nft_id, bid_price));
 	
 			Ok(())
 		}
-
-		// TODO Part IV: breed_NFT
 	}
 
 	//** Our helper functions.**//
@@ -402,6 +392,32 @@ pub mod pallet {
 		pub fn balance_to_u64(input: BalanceOf<T>) -> Option<u64> {
 			TryInto::<u64>::try_into(input).ok()
 		}
-	
+		//Function to pay creator sare
+		pub fn pay_creator_royalty(
+			buyer: &T::AccountId,
+			creator: &T::AccountId,
+			creator_share: BalanceOf<T>
+		) -> DispatchResult{
+			let buyer_ = buyer.clone();
+			let creator_ = creator.clone();
+			T::Currency::transfer(&buyer, &creator, creator_share, ExistenceRequirement::KeepAlive)?;	
+			//Deposit the realavnt Event
+			Self::deposit_event(Event::CreatorRoyaltyPaid(buyer_, creator_, creator_share));
+			Ok(())
+
+		}
+		//Function to pay the owner's share
+		pub fn pay_owner_share(
+			buyer: &T::AccountId, 
+			seller: &T::AccountId,
+			owner_share: BalanceOf<T>
+		) -> DispatchResult{
+		   let buyer_ = buyer.clone();
+		   let seller_ = seller.clone();
+
+			T::Currency::transfer(&buyer, &seller, owner_share, ExistenceRequirement::KeepAlive)?;	
+			Self::deposit_event(Event::OwnerPaid(buyer_, seller_, owner_share));
+			Ok(())
+		}
 	}
-}
+}			
